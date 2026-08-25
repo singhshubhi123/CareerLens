@@ -202,28 +202,37 @@ function readFileContent(file, textarea, charCount) {
       showUploadStatus(`Failed to parse "${file.name}": ${err.message}. Please paste the text manually.`, true);
       showToast('PDF parsing failed. Please paste the text manually.', 'error', 5000);
     });
+  } else if (file.name.toLowerCase().endsWith('.doc') || file.name.toLowerCase().endsWith('.docx')) {
+    hideUploadStatus();
+    extractDocxText(file).then(text => {
+      if (!text || text.trim().length < 20) {
+        showUploadStatus(`"${file.name}" could not be read — the file may be corrupted or empty. Please paste the text manually.`, true);
+        showToast('Could not extract text from DOCX. Try pasting text manually.', 'warning', 5000);
+        return;
+      }
+      textarea.value = text;
+      const words = text.trim().split(/\s+/).filter(Boolean).length;
+      charCount.textContent = `${words} word${words !== 1 ? 's' : ''}`;
+      showUploadStatus(`"${file.name}" uploaded and text extracted successfully (${words} words).`);
+      showToast(`${file.name} loaded — ${words} words extracted!`, 'success');
+    }).catch(err => {
+      showUploadStatus(`Failed to parse "${file.name}": ${err.message}. Please paste the text manually.`, true);
+      showToast('DOCX parsing failed. Please paste the text manually.', 'error', 5000);
+    });
   } else {
-    const isDocx = file.name.toLowerCase().endsWith('.doc') || file.name.toLowerCase().endsWith('.docx');
-    if (isDocx) {
-      showUploadStatus(`DOCX files cannot be read directly. Please open "${file.name}" in Word, copy all the text, and paste it into the text area below.`, false);
-      showToast('For DOCX files, please paste the text content directly. Copy text from your Word document and paste it.', 'info', 5000);
-    } else {
-      showUploadStatus(`Unsupported file type. Please upload a PDF (.pdf), Word (.docx), or plain text (.txt) file.`, true);
-      showToast('Unsupported file type — PDF, DOCX, and TXT are accepted.', 'error');
-    }
+    showUploadStatus(`Unsupported file type. Please upload a PDF (.pdf), Word (.docx), or plain text (.txt) file.`, true);
+    showToast('Unsupported file type — PDF, DOCX, and TXT are accepted.', 'error');
   }
 }
 
 async function extractPdfText(file) {
-  // Load pdfjs-dist from the installed npm package (Vite resolves this locally)
-  const pdfjsLib = await import('pdfjs-dist');
+  // pdfjsLib is loaded as a global via the CDN <script> tag in index.html
+  const pdfjsLib = window.pdfjsLib;
+  if (!pdfjsLib) throw new Error('PDF library not loaded');
 
-  // Point the worker at the installed package's worker file.
-  // Vite resolves `new URL('…', import.meta.url)` to a proper asset URL at build time.
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.mjs',
-    import.meta.url
-  ).toString();
+  // Worker URL must match the CDN version of the main library
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
   const arrayBuffer = await file.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
@@ -233,7 +242,6 @@ async function extractPdfText(file) {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    // Join items with a space; add newline between lines by checking y-position changes
     const lines = [];
     let lastY = null;
     for (const item of content.items) {
@@ -248,6 +256,13 @@ async function extractPdfText(file) {
     pageTexts.push(lines.join(' '));
   }
   return pageTexts.join('\n');
+}
+
+async function extractDocxText(file) {
+  // mammoth is loaded as a browser global via public/mammoth.browser.min.js
+  const arrayBuffer = await file.arrayBuffer();
+  const result = await window.mammoth.extractRawText({ arrayBuffer });
+  return result.value;
 }
 
 function runAnalysis(text, appState) {
