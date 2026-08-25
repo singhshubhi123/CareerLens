@@ -20,7 +20,7 @@ export function render(appState) {
         <div class="upload-zone mb-4" id="upload-zone">
           <div class="upload-icon">📁</div>
           <div class="upload-title">Drag & drop your resume</div>
-          <div class="upload-sub">Supports PDF, DOCX, or plain text files</div>
+          <div class="upload-sub">Supports PDF, DOCX, or plain text files · Max 5 MB</div>
           <div class="file-types">
             <span class="tag tag-blue">PDF</span>
             <span class="tag tag-blue">DOCX</span>
@@ -29,6 +29,9 @@ export function render(appState) {
           <input type="file" id="file-input" accept=".txt,.pdf,.doc,.docx" style="display:none"/>
           <button class="btn btn-secondary mt-4" id="upload-btn">Choose File</button>
         </div>
+
+        <!-- File upload status banner (shown after a file is loaded) -->
+        <div id="upload-status" style="display:none"></div>
 
         <!-- Divider -->
         <div style="text-align:center;margin:1rem 0;color:var(--text-secondary);font-size:0.875rem;position:relative">
@@ -137,19 +140,114 @@ export function onMount(appState) {
   });
 }
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
+function showUploadStatus(message, isError = false) {
+  const el = document.getElementById('upload-status');
+  if (!el) return;
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="upload-status-banner ${isError ? 'upload-status-error' : 'upload-status-success'}">
+      <span>${isError ? '⚠️' : '✅'}</span>
+      <span>${message}</span>
+    </div>
+  `;
+}
+
+function hideUploadStatus() {
+  const el = document.getElementById('upload-status');
+  if (el) el.style.display = 'none';
+}
+
 function readFileContent(file, textarea, charCount) {
-  if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+  // Size guard
+  if (file.size > MAX_FILE_SIZE) {
+    showUploadStatus(`"${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is 5 MB.`, true);
+    showToast('File too large — max 5 MB allowed.', 'error');
+    return;
+  }
+
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  const isTxt = file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
+
+  if (isTxt) {
+    hideUploadStatus();
     const reader = new FileReader();
     reader.onload = e => {
       textarea.value = e.target.result;
-      const words = e.target.result.trim().split(/\s+/).length;
-      charCount.textContent = `${words} words`;
+      const words = e.target.result.trim().split(/\s+/).filter(Boolean).length;
+      charCount.textContent = `${words} word${words !== 1 ? 's' : ''}`;
+      showUploadStatus(`"${file.name}" loaded successfully (${words} words).`);
       showToast(`${file.name} loaded!`, 'success');
     };
+    reader.onerror = () => {
+      showUploadStatus(`Could not read "${file.name}". Please try again.`, true);
+      showToast('Failed to read the file.', 'error');
+    };
     reader.readAsText(file);
+  } else if (isPdf) {
+    hideUploadStatus();
+    extractPdfText(file).then(text => {
+      if (!text || text.trim().length < 20) {
+        showUploadStatus(`"${file.name}" could not be read — the PDF may be image-based or password-protected. Please paste the text manually.`, true);
+        showToast('Could not extract text from PDF. Try pasting text manually.', 'warning', 5000);
+        return;
+      }
+      textarea.value = text;
+      const words = text.trim().split(/\s+/).filter(Boolean).length;
+      charCount.textContent = `${words} word${words !== 1 ? 's' : ''}`;
+      showUploadStatus(`"${file.name}" uploaded and text extracted successfully (${words} words).`);
+      showToast(`${file.name} loaded — ${words} words extracted!`, 'success');
+    }).catch(err => {
+      showUploadStatus(`Failed to parse "${file.name}": ${err.message}. Please paste the text manually.`, true);
+      showToast('PDF parsing failed. Please paste the text manually.', 'error', 5000);
+    });
   } else {
-    showToast('For PDF/DOCX files, please paste the text content directly. Copy text from your PDF reader and paste it.', 'info', 5000);
+    const isDocx = file.name.toLowerCase().endsWith('.doc') || file.name.toLowerCase().endsWith('.docx');
+    if (isDocx) {
+      showUploadStatus(`DOCX files cannot be read directly. Please open "${file.name}" in Word, copy all the text, and paste it into the text area below.`, false);
+      showToast('For DOCX files, please paste the text content directly. Copy text from your Word document and paste it.', 'info', 5000);
+    } else {
+      showUploadStatus(`Unsupported file type. Please upload a PDF (.pdf), Word (.docx), or plain text (.txt) file.`, true);
+      showToast('Unsupported file type — PDF, DOCX, and TXT are accepted.', 'error');
+    }
   }
+}
+
+async function extractPdfText(file) {
+  // Load pdfjs-dist from the installed npm package (Vite resolves this locally)
+  const pdfjsLib = await import('pdfjs-dist');
+
+  // Point the worker at the installed package's worker file.
+  // Vite resolves `new URL('…', import.meta.url)` to a proper asset URL at build time.
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.mjs',
+    import.meta.url
+  ).toString();
+
+  const arrayBuffer = await file.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+  const pdf = await loadingTask.promise;
+
+  const pageTexts = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // Join items with a space; add newline between lines by checking y-position changes
+    const lines = [];
+    let lastY = null;
+    for (const item of content.items) {
+      if ('str' in item) {
+        if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) {
+          lines.push('\n');
+        }
+        lines.push(item.str);
+        lastY = item.transform[5];
+      }
+    }
+    pageTexts.push(lines.join(' '));
+  }
+  return pageTexts.join('\n');
 }
 
 function runAnalysis(text, appState) {

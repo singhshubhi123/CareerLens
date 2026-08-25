@@ -46,6 +46,30 @@
   flex-wrap: wrap;
 }
 
+/* Upload Status Banner */
+.upload-status-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--border-radius);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+}
+
+.upload-status-success {
+  background: #defbe6;
+  color: #044317;
+  border: 1px solid #a7f0ba;
+}
+
+.upload-status-error {
+  background: #fff1f1;
+  color: #750e13;
+  border: 1px solid #ffb3b8;
+}
+
 /* Extracted Data Section */
 .extracted-section { margin-top: var(--sp-05); }
 
