@@ -6,29 +6,49 @@ import DATA from './data.js';
 
 /**
  * Start a new interview session.
- * @param {string} careerId - target career (e.g. 'data-scientist')
- * @param {number} count    - number of questions (3, 5, or 10)
+ * @param {string} careerId    - target career (e.g. 'data-scientist')
+ * @param {number} count       - number of questions (3, 5, or 10)
+ * @param {string} type        - 'mixed' | 'technical' | 'behavioral'
+ * @param {boolean} timedMode  - auto-advance when question timer runs out
  * @returns {InterviewSession}
  */
-export function startSession(careerId, count = 5) {
+export function startSession(careerId, count = 5, type = 'mixed', timedMode = false) {
   const careerQuestions = DATA.interviewQuestions[careerId] || [];
   const generalQuestions = DATA.interviewQuestions.general || [];
 
-  // Mix career-specific + general questions
-  const careerCount = Math.min(Math.ceil(count * 0.7), careerQuestions.length);
-  const generalCount = count - careerCount;
+  // Behavioral topics (general pool only – career Qs are always technical)
+  const behavioralTopics = ['Behavioral', 'Career Goals', 'Teamwork'];
 
-  const shuffledCareer = shuffle([...careerQuestions]).slice(0, careerCount);
-  const shuffledGeneral = shuffle([...generalQuestions]).slice(0, generalCount);
+  let pool;
+  if (type === 'behavioral') {
+    // Only behavioral questions from general pool
+    pool = generalQuestions.filter(q => behavioralTopics.includes(q.topic));
+    // Pad with all general if not enough
+    if (pool.length < count) pool = [...generalQuestions];
+  } else if (type === 'technical') {
+    // Only career-specific questions (no general behavioral)
+    pool = [...careerQuestions];
+    if (pool.length < count) pool = [...careerQuestions, ...generalQuestions.filter(q => !behavioralTopics.includes(q.topic))];
+  } else {
+    // Mixed: 70% career-specific + 30% general
+    const careerCount = Math.min(Math.ceil(count * 0.7), careerQuestions.length);
+    const generalCount = count - careerCount;
+    const shuffledCareer = shuffle([...careerQuestions]).slice(0, careerCount);
+    const shuffledGeneral = shuffle([...generalQuestions]).slice(0, generalCount);
+    pool = [...shuffledCareer, ...shuffledGeneral];
+  }
 
-  const questions = shuffle([...shuffledCareer, ...shuffledGeneral]);
+  const questions = shuffle([...pool]).slice(0, count);
 
   return {
     id: `session-${Date.now()}`,
     careerId,
+    type,
+    timedMode,
     questions,
     answers: new Array(questions.length).fill(''),
     feedbacks: new Array(questions.length).fill(null),
+    bookmarks: new Array(questions.length).fill(false),
     currentIndex: 0,
     startedAt: Date.now(),
     endedAt: null,
@@ -178,12 +198,62 @@ export function saveSession(session) {
   const summary = {
     id: session.id,
     careerId: session.careerId,
+    type: session.type || 'mixed',
     date: new Date().toISOString(),
     score: computeSessionScore(session),
     questionCount: session.questions.length,
   };
   history.unshift(summary);
   localStorage.setItem('interviewHistory', JSON.stringify(history.slice(0, 20)));
+}
+
+/**
+ * Toggle bookmark for a question index.
+ */
+export function toggleBookmark(session, idx) {
+  if (!session.bookmarks) session.bookmarks = new Array(session.questions.length).fill(false);
+  session.bookmarks[idx] = !session.bookmarks[idx];
+}
+
+/**
+ * Generate a structured sample answer framework from the question's metadata.
+ * Fully client-side — no backend required.
+ */
+export function generateSampleAnswer(question) {
+  const isBehavioral = ['Behavioral', 'Career Goals', 'Teamwork'].includes(question.topic);
+  const tips = question.tips || '';
+
+  // Parse tips into bullet points split by '. ' or '. '
+  const tipPoints = tips
+    .split(/(?<=[.!])\s+/)
+    .map(s => s.replace(/\.$/, '').trim())
+    .filter(s => s.length > 10);
+
+  if (isBehavioral) {
+    return {
+      framework: 'STAR Method',
+      description: 'Structure behavioral answers using Situation → Task → Action → Result.',
+      sections: [
+        { label: 'Situation', hint: 'Set the scene — describe the context and challenge you faced.' },
+        { label: 'Task', hint: 'Explain your specific responsibility or what was expected of you.' },
+        { label: 'Action', hint: `Describe the steps you took. ${tipPoints[0] || ''}` },
+        { label: 'Result', hint: 'Share the outcome — quantify impact where possible (%, time saved, etc.).' },
+      ],
+      tips: tipPoints,
+    };
+  }
+
+  // Technical questions: use a 3-part framework
+  return {
+    framework: 'Define → Explain → Example',
+    description: 'Strong technical answers cover the concept, its mechanics, and a real-world application.',
+    sections: [
+      { label: 'Define', hint: 'Start with a clear, concise definition of the core concept.' },
+      { label: 'Explain', hint: `Cover the key mechanics or tradeoffs. ${tipPoints[0] || ''}` },
+      { label: 'Example / Application', hint: `Ground it in a real scenario or project. ${tipPoints[1] || 'Mention a specific tool, system, or experience you have used.'}` },
+    ],
+    tips: tipPoints,
+  };
 }
 
 /* Utility */

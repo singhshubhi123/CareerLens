@@ -12,6 +12,7 @@ export const state = {
   roadmap: null,           // generated roadmap object
   completedCourses: [],    // array of course ids
   interviewSession: null,  // current interview session
+  lastSession: null,       // completed session shown on summary screen
   currentPage: 'dashboard',
 };
 
@@ -36,6 +37,7 @@ export function saveState() {
     try {
       const toSave = { ...state };
       delete toSave.interviewSession; // session is transient
+      delete toSave.lastSession;      // summary is transient
       localStorage.setItem('careerCopilotState', JSON.stringify(toSave));
     } catch (e) {
       console.warn('Could not save state:', e);

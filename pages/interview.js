@@ -2,14 +2,15 @@
    Mock Interview Page
    ========================================================= */
 import { navigateTo, saveState, showToast, el } from '../js/app.js';
-import { startSession, evaluateAnswer, computeSessionScore, saveSession } from '../js/interview.js';
+import { startSession, evaluateAnswer, computeSessionScore, saveSession, toggleBookmark, generateSampleAnswer } from '../js/interview.js';
 import DATA from '../js/data.js';
 
 export function render(appState) {
   const container = el('div', { className: 'animate-in' });
 
-  // If no session active, show setup screen
-  if (!appState.interviewSession) {
+  if (appState.lastSession) {
+    container.innerHTML = renderSessionSummary(appState.lastSession);
+  } else if (!appState.interviewSession) {
     container.innerHTML = renderSetupScreen(appState);
   } else {
     container.innerHTML = renderInterviewScreen(appState.interviewSession, appState);
@@ -19,7 +20,9 @@ export function render(appState) {
 }
 
 export function onMount(appState) {
-  if (!appState.interviewSession) {
+  if (appState.lastSession) {
+    mountSessionSummary(appState);
+  } else if (!appState.interviewSession) {
     mountSetup(appState);
   } else {
     mountInterview(appState);
@@ -83,6 +86,14 @@ function renderSetupScreen(appState) {
           </div>
         </div>
 
+        <div class="form-group">
+          <label class="form-label">Timed Mode</label>
+          <label class="form-check" style="align-items:flex-start">
+            <input type="checkbox" id="timed-mode-toggle" style="margin-top:2px">
+            <span>Auto-advance to next question when the 2-minute timer runs out</span>
+          </label>
+        </div>
+
         <button class="btn btn-primary btn-lg w-full" id="start-interview-btn">
           🎤 Start Interview Session
         </button>
@@ -132,7 +143,9 @@ function mountSetup(appState) {
 
   document.getElementById('start-interview-btn')?.addEventListener('click', () => {
     const careerId = document.getElementById('career-select')?.value || 'data-scientist';
-    appState.interviewSession = startSession(careerId, selectedCount);
+    const type = document.querySelector('input[name="interview-type"]:checked')?.value || 'mixed';
+    const timedMode = document.getElementById('timed-mode-toggle')?.checked || false;
+    appState.interviewSession = startSession(careerId, selectedCount, type, timedMode);
     navigateTo('interview');
   });
 
@@ -148,10 +161,15 @@ function mountSetup(appState) {
         </div>
         ${history.map(h => {
           const career = DATA.careerPaths.find(c => c.id === h.careerId);
+          const typeBadgeColor = h.type === 'technical' ? '#0043ce' : h.type === 'behavioral' ? '#6929c4' : '#005d5d';
+          const typeLabel = h.type ? (h.type.charAt(0).toUpperCase() + h.type.slice(1)) : 'Mixed';
           return `
             <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid var(--ui-03);font-size:0.875rem">
               <div>
-                <div style="font-weight:500">${career?.emoji || '🤖'} ${career?.title || h.careerId}</div>
+                <div style="font-weight:500;display:flex;align-items:center;gap:0.5rem">
+                  ${career?.emoji || '🤖'} ${career?.title || h.careerId}
+                  <span style="font-size:0.65rem;font-weight:600;padding:1px 6px;border-radius:10px;background:${typeBadgeColor};color:#fff;letter-spacing:0.03em">${typeLabel}</span>
+                </div>
                 <div style="color:var(--text-secondary);font-size:0.75rem">${new Date(h.date).toLocaleDateString()} · ${h.questionCount} questions</div>
               </div>
               <div style="text-align:right">
@@ -195,7 +213,12 @@ function renderInterviewScreen(session, appState) {
       <div class="interview-main">
         <!-- Question -->
         <div class="question-card">
-          <div class="question-number">Question ${qNum} of ${total}</div>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem">
+            <div class="question-number">Question ${qNum} of ${total}</div>
+            <button class="btn-bookmark ${session.bookmarks[session.currentIndex] ? 'bookmarked' : ''}" id="bookmark-btn" title="Bookmark this question">
+              ${session.bookmarks[session.currentIndex] ? '🔖' : '🏷️'}
+            </button>
+          </div>
           <div class="question-text">${q.q}</div>
           <div style="display:flex;gap:0.5rem;margin-top:0.75rem;flex-wrap:wrap">
             <span class="question-difficulty">
@@ -212,9 +235,12 @@ function renderInterviewScreen(session, appState) {
 
         <!-- Answer Area -->
         <div class="answer-area">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem">
             <div style="font-size:0.875rem;font-weight:600;color:var(--text-secondary)">Your Answer</div>
-            <div id="word-count-answer" style="font-size:0.75rem;color:var(--text-secondary)">0 words</div>
+            <div id="word-count-answer" style="font-size:0.75rem;color:var(--text-secondary)">0 / 150 words</div>
+          </div>
+          <div class="wc-bar-wrap" style="margin-bottom:0.75rem">
+            <div class="wc-bar-fill" id="wc-bar" style="width:0%"></div>
           </div>
           <textarea class="answer-textarea" id="answer-input" 
             placeholder="Type your answer here. Be specific, use examples, and structure your response clearly…"
@@ -279,6 +305,24 @@ function renderInterviewScreen(session, appState) {
   `;
 }
 
+function wireSampleAnswerToggle(feedbackArea, question) {
+  const toggleBtn = feedbackArea.querySelector('.sample-answer-toggle');
+  const samplePanel = feedbackArea.querySelector('.sample-answer-panel');
+  if (!toggleBtn || !samplePanel) return;
+  toggleBtn.addEventListener('click', () => {
+    const isOpen = !samplePanel.classList.contains('hidden');
+    if (isOpen) {
+      samplePanel.classList.add('hidden');
+      samplePanel.innerHTML = '';
+      toggleBtn.textContent = '💡 View Sample Answer Framework';
+    } else {
+      samplePanel.innerHTML = renderSampleAnswerPanel(question);
+      samplePanel.classList.remove('hidden');
+      toggleBtn.textContent = '✖ Hide Sample Answer';
+    }
+  });
+}
+
 function mountInterview(appState) {
   const session = appState.interviewSession;
   let timerInterval;
@@ -304,21 +348,53 @@ function mountInterview(appState) {
       qTimerEl.textContent = `${m}:${s}`;
       qTimerEl.className = `interview-timer${questionSeconds <= 30 ? ' warning' : ''}`;
     }
-    if (questionSeconds <= 0) clearInterval(timerInterval);
+    if (questionSeconds <= 0) {
+      clearInterval(timerInterval);
+      if (session.timedMode) {
+        saveCurrentAnswer(session, document.getElementById('answer-input'));
+        goToQuestion(session.currentIndex + 1, session, appState, timerInterval, sessionInterval);
+      }
+    }
   }, 1000);
 
-  // Word count
+  // Word count + progress bar
+  const WC_TARGET = 150;
   const answerInput = document.getElementById('answer-input');
   const wordCountEl = document.getElementById('word-count-answer');
-  answerInput?.addEventListener('input', () => {
+  const wcBar = document.getElementById('wc-bar');
+
+  function updateWordCount() {
     const words = answerInput.value.trim().split(/\s+/).filter(Boolean).length;
-    if (wordCountEl) wordCountEl.textContent = `${words} words`;
-  });
-  // Init word count
-  if (answerInput && wordCountEl) {
-    const words = answerInput.value.trim().split(/\s+/).filter(Boolean).length;
-    wordCountEl.textContent = `${words} words`;
+    if (wordCountEl) wordCountEl.textContent = `${words} / ${WC_TARGET} words`;
+    if (wcBar) {
+      const pct = Math.min(100, Math.round((words / WC_TARGET) * 100));
+      wcBar.style.width = pct + '%';
+      wcBar.className = 'wc-bar-fill' + (words >= WC_TARGET ? ' wc-bar-done' : words >= WC_TARGET * 0.6 ? ' wc-bar-mid' : '');
+    }
   }
+
+  answerInput?.addEventListener('input', updateWordCount);
+  updateWordCount();
+
+  // Wire sample answer toggle + retry if feedback already exists (navigating back to answered question)
+  const existingFeedbackArea = document.getElementById('feedback-area');
+  if (existingFeedbackArea && session.feedbacks[session.currentIndex]) {
+    wireSampleAnswerToggle(existingFeedbackArea, session.questions[session.currentIndex]);
+    wireRetryButton(existingFeedbackArea, session, appState);
+  }
+
+  // Bookmark
+  document.getElementById('bookmark-btn')?.addEventListener('click', () => {
+    toggleBookmark(session, session.currentIndex);
+    saveState();
+    const btn = document.getElementById('bookmark-btn');
+    if (btn) {
+      const isBookmarked = session.bookmarks[session.currentIndex];
+      btn.textContent = isBookmarked ? '🔖' : '🏷️';
+      btn.classList.toggle('bookmarked', isBookmarked);
+    }
+    showToast(session.bookmarks[session.currentIndex] ? 'Question bookmarked' : 'Bookmark removed', 'info');
+  });
 
   // Submit answer
   document.getElementById('submit-answer-btn')?.addEventListener('click', () => {
@@ -338,6 +414,8 @@ function mountInterview(appState) {
       feedbackArea.innerHTML = renderFeedbackInline(feedback);
       feedbackArea.classList.remove('hidden');
       feedbackArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      wireSampleAnswerToggle(feedbackArea, question);
+      wireRetryButton(feedbackArea, session, appState);
     }
 
     // Update score ring
@@ -382,10 +460,11 @@ function mountInterview(appState) {
     session.completed = true;
     session.endedAt = Date.now();
     saveSession(session);
+    appState.lastSession = session;
     appState.interviewSession = null;
     saveState();
-    navigateTo('score');
-    showToast('Interview complete! Check your Job Readiness Score 🎉', 'success');
+    navigateTo('interview');
+    showToast('Interview complete! Reviewing your session… 🎉', 'success');
   });
 
   // End session
@@ -408,6 +487,20 @@ function mountInterview(appState) {
       goToQuestion(parseInt(dot.dataset.idx), session, appState, timerInterval, sessionInterval);
     });
   });
+
+  // Keyboard shortcuts: ← Prev, → Next
+  function onKeydown(e) {
+    // Only if not typing in textarea
+    if (document.activeElement === answerInput) return;
+    if (e.key === 'ArrowLeft' && session.currentIndex > 0) {
+      saveCurrentAnswer(session, answerInput);
+      goToQuestion(session.currentIndex - 1, session, appState, timerInterval, sessionInterval);
+    } else if (e.key === 'ArrowRight' && session.currentIndex < session.questions.length - 1) {
+      saveCurrentAnswer(session, answerInput);
+      goToQuestion(session.currentIndex + 1, session, appState, timerInterval, sessionInterval);
+    }
+  }
+  document.addEventListener('keydown', onKeydown);
 }
 
 function goToQuestion(idx, session, appState, timerInterval, sessionInterval) {
@@ -469,10 +562,176 @@ function renderFeedbackInline(feedback) {
           </div>
         </div>
       ` : ''}
+
+      <div style="display:flex;gap:0.5rem;margin-top:0.75rem">
+        <button class="btn btn-ghost btn-sm sample-answer-toggle" style="flex:1">
+          💡 View Sample Answer Framework
+        </button>
+        <button class="btn btn-secondary btn-sm retry-btn" title="Clear answer and try again">
+          🔄 Retry
+        </button>
+      </div>
+      <div class="sample-answer-panel hidden"></div>
+    </div>
+  `;
+}
+
+function renderSampleAnswerPanel(question) {
+  const sample = generateSampleAnswer(question);
+  return `
+    <div style="margin-top:0.75rem;padding:1rem;background:var(--ui-01);border:1px solid var(--ui-03);border-radius:var(--border-radius)">
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem">
+        <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--ibm-blue-dark);background:var(--ibm-blue-light);padding:2px 8px;border-radius:20px">${sample.framework}</span>
+        <span style="font-size:0.8rem;color:var(--text-secondary)">${sample.description}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.75rem">
+        ${sample.sections.map((s, i) => `
+          <div style="display:flex;gap:0.75rem;align-items:flex-start">
+            <div style="min-width:24px;height:24px;border-radius:50%;background:var(--ibm-blue-dark);color:#fff;font-size:0.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px">${i + 1}</div>
+            <div>
+              <div style="font-size:0.8125rem;font-weight:600;color:var(--text-primary)">${s.label}</div>
+              <div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.5">${s.hint}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      ${sample.tips.length > 1 ? `
+        <div style="border-top:1px solid var(--ui-03);padding-top:0.625rem;margin-top:0.25rem">
+          <div style="font-size:0.75rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.375rem">Key points to cover:</div>
+          <ul style="margin:0;padding-left:1.25rem;font-size:0.8rem;color:var(--text-secondary);line-height:1.6">
+            ${sample.tips.map(t => `<li>${t}</li>`).join('')}
+          </ul>
+        </div>
+      ` : ''}
     </div>
   `;
 }
 
 function getDifficultyEmoji(d) {
   return d === 'Easy' ? '🟢' : d === 'Medium' ? '🟡' : '🔴';
+}
+
+/* =========================================================
+   RETRY QUESTION
+   ========================================================= */
+function wireRetryButton(feedbackArea, session, appState) {
+  const retryBtn = feedbackArea.querySelector('.retry-btn');
+  if (!retryBtn) return;
+  retryBtn.addEventListener('click', () => {
+    const idx = session.currentIndex;
+    // Clear this question's answer and feedback
+    session.answers[idx] = '';
+    session.feedbacks[idx] = null;
+    saveState();
+    // Re-render interview screen so question timer resets
+    navigateTo('interview');
+  });
+}
+
+/* =========================================================
+   SESSION SUMMARY SCREEN
+   ========================================================= */
+function renderSessionSummary(session) {
+  const scoreData = computeSessionScore(session);
+  const career = DATA.careerPaths.find(c => c.id === session.careerId);
+  const durationSec = session.endedAt && session.startedAt
+    ? Math.round((session.endedAt - session.startedAt) / 1000) : 0;
+  const durationStr = durationSec > 0
+    ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s` : '—';
+  const bookmarkedCount = (session.bookmarks || []).filter(Boolean).length;
+  const answeredCount = session.feedbacks.filter(f => f !== null && f.overallScore > 0).length;
+
+  const scoreColor = scoreData.avg >= 70 ? 'var(--ibm-green)' : scoreData.avg >= 50 ? 'var(--ibm-orange)' : 'var(--ibm-red)';
+
+  return `
+    <div class="page-header">
+      <h1>🏁 Session Complete</h1>
+      <p>${career?.emoji || '🤖'} ${career?.title || session.careerId} · ${session.type || 'Mixed'} · ${session.questions.length} questions</p>
+    </div>
+
+    <!-- Hero score strip -->
+    <div style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;background:var(--ui-01);border:1px solid var(--ui-03);border-radius:var(--border-radius);padding:1.25rem 1.5rem;margin-bottom:1.5rem">
+      <div style="text-align:center;min-width:80px">
+        <div style="font-size:2.5rem;font-weight:700;color:${scoreColor};line-height:1">${scoreData.avg}%</div>
+        <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px">Avg Score</div>
+      </div>
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;flex:1">
+        <div style="text-align:center">
+          <div style="font-size:1.25rem;font-weight:700">${answeredCount}/${session.questions.length}</div>
+          <div style="font-size:0.75rem;color:var(--text-secondary)">Answered</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:1.25rem;font-weight:700">${bookmarkedCount}</div>
+          <div style="font-size:0.75rem;color:var(--text-secondary)">Bookmarked</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:1.25rem;font-weight:700">${durationStr}</div>
+          <div style="font-size:0.75rem;color:var(--text-secondary)">Duration</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
+        <button class="btn btn-primary" id="summary-score-btn">📊 View Readiness Score</button>
+        <button class="btn btn-secondary" id="summary-new-btn">🔁 New Session</button>
+      </div>
+    </div>
+
+    <!-- Per-question breakdown -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📋 Question-by-Question Review</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0">
+        ${session.questions.map((q, i) => {
+          const fb = session.feedbacks[i];
+          const ans = session.answers[i] || '';
+          const bk = session.bookmarks?.[i];
+          const qColor = fb ? (fb.overallScore >= 70 ? 'var(--ibm-green)' : fb.overallScore >= 50 ? 'var(--ibm-orange)' : 'var(--ibm-red)') : 'var(--text-secondary)';
+          return `
+            <div style="padding:1rem 0;border-bottom:1px solid var(--ui-03)">
+              <div style="display:flex;align-items:flex-start;gap:0.75rem">
+                <!-- Score circle -->
+                <div style="min-width:44px;height:44px;border-radius:50%;border:2px solid ${qColor};display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;color:${qColor};flex-shrink:0">
+                  ${fb ? fb.overallScore + '%' : '—'}
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:4px;flex-wrap:wrap">
+                    <span style="font-size:0.75rem;font-weight:600;color:var(--text-secondary)">Q${i + 1}</span>
+                    <span style="font-size:0.75rem;padding:1px 7px;border-radius:10px;background:var(--ui-02);color:var(--text-secondary)">${q.topic}</span>
+                    <span style="font-size:0.75rem">${getDifficultyEmoji(q.difficulty)} ${q.difficulty}</span>
+                    ${bk ? '<span style="font-size:0.75rem" title="Bookmarked">🔖</span>' : ''}
+                  </div>
+                  <div style="font-size:0.9rem;font-weight:500;margin-bottom:0.5rem;color:var(--text-primary)">${q.q}</div>
+                  ${ans ? `
+                    <details style="margin-bottom:0.5rem">
+                      <summary style="font-size:0.8rem;cursor:pointer;color:var(--ibm-blue-dark);font-weight:500">Your answer</summary>
+                      <div style="margin-top:0.375rem;padding:0.625rem;background:var(--ui-01);border-radius:6px;font-size:0.8125rem;color:var(--text-secondary);line-height:1.55;white-space:pre-wrap">${ans.trim()}</div>
+                    </details>
+                  ` : '<div style="font-size:0.8rem;color:var(--text-secondary);font-style:italic;margin-bottom:0.5rem">Not answered</div>'}
+                  ${fb ? `
+                    <div style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:0.375rem">${fb.feedback}</div>
+                    <div style="display:flex;gap:0.375rem;flex-wrap:wrap">
+                      ${Object.entries(fb.criteria).map(([k, v]) => `
+                        <span style="font-size:0.7rem;padding:1px 7px;border-radius:10px;background:${v >= 70 ? '#d1fae5' : v >= 45 ? '#fef3c7' : '#fee2e2'};color:${v >= 70 ? '#065f46' : v >= 45 ? '#92400e' : '#991b1b'};font-weight:600">${k[0].toUpperCase() + k.slice(1)}: ${v}%</span>
+                      `).join('')}
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function mountSessionSummary(appState) {
+  document.getElementById('summary-score-btn')?.addEventListener('click', () => {
+    appState.lastSession = null;
+    navigateTo('score');
+  });
+  document.getElementById('summary-new-btn')?.addEventListener('click', () => {
+    appState.lastSession = null;
+    navigateTo('interview');
+  });
 }
