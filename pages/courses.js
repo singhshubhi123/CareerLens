@@ -4,14 +4,15 @@
 import { navigateTo, saveState, showToast, el } from '../js/app.js';
 import { recommendCourses } from '../js/recommender.js';
 import DATA from '../js/data.js';
+import { evaluateAchievements, updateStreak } from '../js/achievements.js';
 
 export function render(appState) {
   const container = el('div', { className: 'animate-in' });
   const careerIds = appState.selectedCareers.length > 0 ? appState.selectedCareers : [];
   const courses = recommendCourses(careerIds, appState.profile?.skills || []);
 
-  const categories = ['all', 'ai', 'cloud', 'data', 'security', 'development', 'design', 'methodology'];
-  const catLabels = { all: 'All Courses', ai: '🤖 AI & ML', cloud: '☁️ Cloud', data: '📊 Data', security: '🔐 Security', development: '💻 Development', design: '🎨 Design', methodology: '📋 Methodology' };
+  const categories = ['all', 'ai', 'cloud', 'data', 'security', 'development', 'design', 'methodology', 'engineering', 'finance'];
+  const catLabels = { all: 'All Courses', ai: '🤖 AI & ML', cloud: '☁️ Cloud', data: '📊 Data', security: '🔐 Security', development: '💻 Development', design: '🎨 Design', methodology: '📋 Methodology', engineering: '🔧 Engineering', finance: '💰 Finance' };
 
   container.innerHTML = `
     <div class="page-header">
@@ -160,8 +161,10 @@ function bindCourseButtons(appState) {
       const id = btn.dataset.id;
       if (!appState.completedCourses.includes(id)) {
         appState.completedCourses.push(id);
+        updateStreak(appState);
         saveState();
-        showToast('Course marked as complete! 🎓 Badge earned!', 'success');
+        showToast('Course marked as complete! 🎓', 'success');
+        _fireAchievements(appState);
         navigateTo('courses');
       }
     });
@@ -195,4 +198,21 @@ function applyFilters(appState) {
     grid.innerHTML = renderCourseCards(courses, appState.completedCourses || []);
     bindCourseButtons(appState);
   }
+}
+
+/* Achievement trigger helper */
+function _fireAchievements(appState) {
+  const earned = evaluateAchievements(appState);
+  if (earned.length > 0) {
+    saveState();
+    _refreshAchievementsBadge(appState);
+    earned.forEach(b => {
+      showToast(`🏅 Badge Unlocked: ${b.icon} ${b.name} (+${b.xp} XP)`, 'success', 4000);
+    });
+  }
+}
+
+function _refreshAchievementsBadge(appState) {
+  const el = document.getElementById('achievements-sidebar-badge');
+  if (el) el.textContent = (appState.badges || []).length;
 }

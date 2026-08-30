@@ -195,12 +195,16 @@ export function getInterviewHistory() {
  */
 export function saveSession(session) {
   const history = getInterviewHistory();
+  const sessionScore = computeSessionScore(session);
+  // Include best single-answer score for the 'perfect-answer' badge
+  const answered = session.feedbacks.filter(f => f !== null && f.overallScore > 0);
+  const best = answered.length > 0 ? Math.max(...answered.map(f => f.overallScore)) : 0;
   const summary = {
     id: session.id,
     careerId: session.careerId,
     type: session.type || 'mixed',
     date: new Date().toISOString(),
-    score: computeSessionScore(session),
+    score: { ...sessionScore, best },
     questionCount: session.questions.length,
   };
   history.unshift(summary);

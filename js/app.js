@@ -1,5 +1,5 @@
 /* =========================================================
-   AI Career Copilot — Application State & Router
+   CareerLens — Application State & Router
    ========================================================= */
 
 /**
@@ -14,12 +14,16 @@ export const state = {
   interviewSession: null,  // current interview session
   lastSession: null,       // completed session shown on summary screen
   currentPage: 'dashboard',
+  // Gamification
+  xp: 0,
+  badges: [],              // [{ id, name, icon, xp, category, tier, earnedAt }]
+  streaks: { current: 0, longest: 0, lastActiveDate: null },
 };
 
 /* Load persisted state */
 function loadState() {
   try {
-    const saved = localStorage.getItem('careerCopilotState');
+    const saved = localStorage.getItem('careerLensState');
     if (saved) {
       const parsed = JSON.parse(saved);
       Object.assign(state, parsed);
@@ -38,7 +42,7 @@ export function saveState() {
       const toSave = { ...state };
       delete toSave.interviewSession; // session is transient
       delete toSave.lastSession;      // summary is transient
-      localStorage.setItem('careerCopilotState', JSON.stringify(toSave));
+      localStorage.setItem('careerLensState', JSON.stringify(toSave));
     } catch (e) {
       console.warn('Could not save state:', e);
     }
@@ -50,14 +54,15 @@ export function saveState() {
    ========================================================= */
 
 const routes = {
-  dashboard: () => import('../pages/dashboard.js'),
-  resume:    () => import('../pages/resume.js'),
-  skills:    () => import('../pages/skills.js'),
-  careers:   () => import('../pages/careers.js'),
-  roadmap:   () => import('../pages/roadmap.js'),
-  courses:   () => import('../pages/courses.js'),
-  interview: () => import('../pages/interview.js'),
-  score:     () => import('../pages/score.js'),
+  dashboard:    () => import('../pages/dashboard.js'),
+  resume:       () => import('../pages/resume.js'),
+  skills:       () => import('../pages/skills.js'),
+  careers:      () => import('../pages/careers.js'),
+  roadmap:      () => import('../pages/roadmap.js'),
+  courses:      () => import('../pages/courses.js'),
+  interview:    () => import('../pages/interview.js'),
+  score:        () => import('../pages/score.js'),
+  achievements: () => import('../pages/achievements.js'),
 };
 
 let currentPage = null;
@@ -220,6 +225,15 @@ export function drawRadarChart(container, labels, values, color = '#0f62fe') {
    ========================================================= */
 export function initApp() {
   loadState();
+
+  // Prime free-courses cache for achievements engine (non-blocking)
+  import('./achievements.js').then(({ primeFreeCoursesCache }) => {
+    primeFreeCoursesCache();
+  });
+
+  // Seed achievements sidebar badge from persisted state
+  const achBadge = document.getElementById('achievements-sidebar-badge');
+  if (achBadge) achBadge.textContent = (state.badges || []).length;
 
   // Set up sidebar navigation
   document.querySelectorAll('.sidebar-item[data-page]').forEach(item => {

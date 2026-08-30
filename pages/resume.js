@@ -3,6 +3,7 @@
    ========================================================= */
 import { navigateTo, saveState, showToast, el } from '../js/app.js';
 import { analyzeResume, DEMO_RESUME } from '../js/analyzer.js';
+import { evaluateAchievements, updateStreak } from '../js/achievements.js';
 
 export function render(appState) {
   const container = el('div', { className: 'animate-in' });
@@ -287,7 +288,9 @@ function runAnalysis(text, appState) {
       }
 
       appState.profile = profile;
+      updateStreak(appState);
       saveState();
+      _fireAchievements(appState);
 
       const resultsPanel = document.getElementById('results-panel');
       if (resultsPanel) {
@@ -462,4 +465,21 @@ function getResumeTips(profile) {
 
 function getStoredResumeText() {
   return sessionStorage.getItem('resumeText') || '';
+}
+
+/* Achievement trigger helper */
+function _fireAchievements(appState) {
+  const earned = evaluateAchievements(appState);
+  if (earned.length > 0) {
+    saveState();
+    _refreshAchievementsBadge(appState);
+    earned.forEach(b => {
+      showToast(`🏅 Badge Unlocked: ${b.icon} ${b.name} (+${b.xp} XP)`, 'success', 4000);
+    });
+  }
+}
+
+function _refreshAchievementsBadge(appState) {
+  const el = document.getElementById('achievements-sidebar-badge');
+  if (el) el.textContent = (appState.badges || []).length;
 }

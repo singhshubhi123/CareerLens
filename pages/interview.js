@@ -4,6 +4,7 @@
 import { navigateTo, saveState, showToast, el } from '../js/app.js';
 import { startSession, evaluateAnswer, computeSessionScore, saveSession, toggleBookmark, generateSampleAnswer } from '../js/interview.js';
 import DATA from '../js/data.js';
+import { evaluateAchievements, updateStreak } from '../js/achievements.js';
 
 export function render(appState) {
   const container = el('div', { className: 'animate-in' });
@@ -462,7 +463,9 @@ function mountInterview(appState) {
     saveSession(session);
     appState.lastSession = session;
     appState.interviewSession = null;
+    updateStreak(appState);
     saveState();
+    _fireAchievements(appState);
     navigateTo('interview');
     showToast('Interview complete! Reviewing your session… 🎉', 'success');
   });
@@ -734,4 +737,21 @@ function mountSessionSummary(appState) {
     appState.lastSession = null;
     navigateTo('interview');
   });
+}
+
+/* Achievement trigger helper */
+function _fireAchievements(appState) {
+  const earned = evaluateAchievements(appState);
+  if (earned.length > 0) {
+    saveState();
+    _refreshAchievementsBadge(appState);
+    earned.forEach(b => {
+      showToast(`🏅 Badge Unlocked: ${b.icon} ${b.name} (+${b.xp} XP)`, 'success', 4000);
+    });
+  }
+}
+
+function _refreshAchievementsBadge(appState) {
+  const el = document.getElementById('achievements-sidebar-badge');
+  if (el) el.textContent = (appState.badges || []).length;
 }

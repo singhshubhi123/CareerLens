@@ -1,8 +1,9 @@
 /* =========================================================
-   Dashboard Page
+   CareerLens — Dashboard Page
    ========================================================= */
 import { navigateTo, saveState, el, drawRadarChart, showToast } from '../js/app.js';
 import { calculateReadinessScore } from '../js/score.js';
+import { CATEGORY_META, getTotalXP, getLevel, getLevelProgress, getXPToNextLevel } from '../js/achievements.js';
 
 export function render(state) {
   const container = el('div', { className: 'animate-in' });
@@ -17,7 +18,7 @@ export function render(state) {
     <div class="dashboard-welcome">
       <div class="welcome-text">
         <h2>Welcome back, ${state.profile?.name || 'Student'}! 👋</h2>
-        <p>Your AI Career Copilot is ready. Let's land your dream job together.</p>
+        <p>See your career clearly. Let's land your dream job together.</p>
         <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:1rem;">
           <div style="background:rgba(255,255,255,0.15);padding:6px 14px;border-radius:12px;font-size:0.8125rem;">
             🎯 Job Readiness: <strong>${readiness.score}%</strong>
@@ -53,7 +54,7 @@ export function render(state) {
       <div class="stat-card" style="--accent-color:var(--ibm-teal)">
         <div class="stat-label">Courses Completed</div>
         <div class="stat-value">${state.completedCourses?.length || 0}</div>
-        <div class="stat-desc">of ${15} IBM SkillsBuild courses</div>
+        <div class="stat-desc">of ${30} IBM SkillsBuild courses</div>
       </div>
       <div class="stat-card" style="--accent-color:var(--ibm-green)">
         <div class="stat-label">Career Paths</div>
@@ -96,12 +97,15 @@ export function render(state) {
     </div>
 
     <!-- Quick actions -->
-    <div class="card">
+    <div class="card mb-5">
       <div class="card-header">
         <div class="card-title">⚡ Quick Actions</div>
       </div>
       <div class="grid grid-4 stagger" id="quick-actions"></div>
     </div>
+
+    <!-- Achievements widget -->
+    ${renderAchievementsWidget(state)}
   `;
 
   return container;
@@ -116,6 +120,7 @@ export function onMount(state) {
   });
 
   document.getElementById('view-all-careers')?.addEventListener('click', () => navigateTo('careers'));
+  document.getElementById('view-all-achievements')?.addEventListener('click', () => navigateTo('achievements'));
 
   // Step list
   renderStepList(state);
@@ -226,4 +231,63 @@ function renderQuickActions(state) {
     card.addEventListener('click', () => navigateTo(a.page));
     wrap.appendChild(card);
   });
+}
+
+function renderAchievementsWidget(state) {
+  const xp      = getTotalXP(state);
+  const level   = getLevel(xp);
+  const prog    = getLevelProgress(xp);
+  const toNext  = getXPToNextLevel(xp);
+  const streak  = state.streaks?.current || 0;
+  const earned  = state.badges || [];
+
+  // Up to 3 most recently earned badges (newest first)
+  const recent = [...earned].reverse().slice(0, 3);
+
+  const emptyMsg = `<span style="color:var(--text-secondary);font-size:0.875rem">Complete actions to unlock your first badge 🔒</span>`;
+
+  const badgeChips = recent.length > 0
+    ? recent.map(b => {
+        const catClass = CATEGORY_META[b.category]?.tagClass || 'tag-blue';
+        return `<span class="tag ${catClass}" style="font-size:0.8rem">${b.icon} ${b.name}</span>`;
+      }).join('')
+    : emptyMsg;
+
+  return `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">🏅 Achievements & Streaks</div>
+        <button class="btn btn-ghost btn-sm" id="view-all-achievements">View All →</button>
+      </div>
+
+      <!-- Pills row -->
+      <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem">
+        <div style="background:rgba(255,131,43,0.12);padding:6px 14px;border-radius:12px;font-size:0.8125rem;font-weight:500">
+          🔥 ${streak}-day streak
+        </div>
+        <div style="background:rgba(15,98,254,0.1);padding:6px 14px;border-radius:12px;font-size:0.8125rem;font-weight:500">
+          ⚡ Level ${level}
+        </div>
+        <div style="background:rgba(105,41,196,0.1);padding:6px 14px;border-radius:12px;font-size:0.8125rem;font-weight:500">
+          🏅 ${earned.length} badges
+        </div>
+      </div>
+
+      <!-- XP progress bar -->
+      <div style="margin-bottom:1rem">
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-secondary);margin-bottom:5px">
+          <span>${xp} XP</span><span>${toNext} XP to Level ${level + 1}</span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" style="width:${prog.toFixed(1)}%;background:var(--ibm-blue)"></div>
+        </div>
+      </div>
+
+      <!-- Recent badges -->
+      <div>
+        <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:0.5rem;font-weight:500">Recent Badges</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem">${badgeChips}</div>
+      </div>
+    </div>
+  `;
 }

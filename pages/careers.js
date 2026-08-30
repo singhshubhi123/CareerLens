@@ -3,6 +3,7 @@
    ========================================================= */
 import { navigateTo, saveState, showToast, el } from '../js/app.js';
 import { recommendCareers } from '../js/recommender.js';
+import { evaluateAchievements, updateStreak } from '../js/achievements.js';
 
 export function render(appState) {
   const container = el('div', { className: 'animate-in' });
@@ -159,8 +160,12 @@ function toggleCareer(careerId, appState) {
     }
     appState.selectedCareers.push(careerId);
     showToast('Career path selected! 🎯', 'success');
+    updateStreak(appState);
+    saveState();
+    _fireAchievements(appState);
+  } else {
+    saveState();
   }
-  saveState();
   navigateTo('careers'); // re-render
 }
 
@@ -262,7 +267,26 @@ function generateAndNavigate(appState, target) {
   import('../js/roadmap.js').then(({ generateRoadmap }) => {
     const roadmap = generateRoadmap(appState.selectedCareers, appState.profile?.skills || [], appState.profile?.experience || 0);
     appState.roadmap = roadmap;
+    updateStreak(appState);
     saveState();
+    _fireAchievements(appState);
     navigateTo(target);
   });
+}
+
+/* Achievement trigger helper */
+function _fireAchievements(appState) {
+  const earned = evaluateAchievements(appState);
+  if (earned.length > 0) {
+    saveState();
+    _refreshAchievementsBadge(appState);
+    earned.forEach(b => {
+      showToast(`🏅 Badge Unlocked: ${b.icon} ${b.name} (+${b.xp} XP)`, 'success', 4000);
+    });
+  }
+}
+
+function _refreshAchievementsBadge(appState) {
+  const el = document.getElementById('achievements-sidebar-badge');
+  if (el) el.textContent = (appState.badges || []).length;
 }

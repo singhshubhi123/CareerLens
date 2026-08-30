@@ -1,6 +1,6 @@
-# 🎯 AI Career Copilot
+# 🔍 CareerLens
 
-**IBM SkillsBuild Hackathon Project** — An AI-powered career guidance platform for students.
+**See your career clearly.** — An AI-powered career guidance platform built on IBM SkillsBuild.
 
 ---
 
@@ -19,7 +19,7 @@
    # VS Code
    Use the "Live Server" extension
    ```
-4. Open `http://localhost:8080/ai-career-copilot/`
+4. Open `http://localhost:8080/careerlens/`
 
 ---
 
@@ -40,7 +40,7 @@
 ## 🏗️ Architecture
 
 ```
-ai-career-copilot/
+careerlens/
 ├── index.html              # App shell, layout, router bootstrap
 ├── css/
 │   ├── main.css            # IBM Carbon-inspired design system
@@ -128,4 +128,4 @@ All state is persisted to `localStorage` automatically:
 
 ---
 
-*Built for the IBM SkillsBuild Hackathon 2025*
+*CareerLens — Built for the IBM SkillsBuild Hackathon 2025*
