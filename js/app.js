@@ -18,6 +18,8 @@ export const state = {
   xp: 0,
   badges: [],              // [{ id, name, icon, xp, category, tier, earnedAt }]
   streaks: { current: 0, longest: 0, lastActiveDate: null },
+  // Resume Builder
+  resumeBuilder: null,     // { contact, summary, experience[], education[], skills[], projects[] }
 };
 
 /* Load persisted state */
@@ -54,15 +56,16 @@ export function saveState() {
    ========================================================= */
 
 const routes = {
-  dashboard:    () => import('../pages/dashboard.js'),
-  resume:       () => import('../pages/resume.js'),
-  skills:       () => import('../pages/skills.js'),
-  careers:      () => import('../pages/careers.js'),
-  roadmap:      () => import('../pages/roadmap.js'),
-  courses:      () => import('../pages/courses.js'),
-  interview:    () => import('../pages/interview.js'),
-  score:        () => import('../pages/score.js'),
-  achievements: () => import('../pages/achievements.js'),
+  dashboard:        () => import('../pages/dashboard.js'),
+  resume:           () => import('../pages/resume.js'),
+  'resume-builder': () => import('../pages/resume-builder.js'),
+  skills:           () => import('../pages/skills.js'),
+  careers:          () => import('../pages/careers.js'),
+  roadmap:          () => import('../pages/roadmap.js'),
+  courses:          () => import('../pages/courses.js'),
+  interview:        () => import('../pages/interview.js'),
+  score:            () => import('../pages/score.js'),
+  achievements:     () => import('../pages/achievements.js'),
 };
 
 let currentPage = null;

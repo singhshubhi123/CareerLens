@@ -163,8 +163,6 @@ function toggleCareer(careerId, appState) {
     updateStreak(appState);
     saveState();
     _fireAchievements(appState);
-  } else {
-    saveState();
   }
   navigateTo('careers'); // re-render
 }

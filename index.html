@@ -15,8 +15,8 @@
   <link rel="stylesheet" href="css/main.css" />
   <link rel="stylesheet" href="css/components.css" />
 
-  <!-- Favicon (inline SVG as data URI) -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230f62fe'/><text x='6' y='23' font-size='20'>🎯</text></svg>" />
+  <!-- Favicon — CL monogram -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%230f62fe'/><stop offset='1' stop-color='%236929c4'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='url(%23g)'/><path d='M20 9 A8 8 0 1 0 20 23' stroke='white' stroke-width='2.8' stroke-linecap='round' fill='none'/><path d='M23 9 L23 23 L29 23' stroke='%2300d4aa' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round' fill='none'/><circle cx='29' cy='9' r='2.2' fill='%2300d4aa'/></svg>" />
 </head>
 <body>
 
@@ -32,24 +32,27 @@
     </button>
 
     <div class="logo">
-      <!-- IBM-style logo mark -->
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="28" height="28" rx="6" fill="#0f62fe"/>
-        <rect x="4" y="6" width="20" height="3" fill="white"/>
-        <rect x="4" y="11" width="20" height="3" fill="white"/>
-        <rect x="4" y="16" width="20" height="3" fill="white"/>
-        <rect x="4" y="21" width="20" height="3" fill="white"/>
-        <rect x="0" y="6" width="3" height="3" fill="white"/>
-        <rect x="0" y="11" width="3" height="3" fill="white"/>
-        <rect x="0" y="16" width="3" height="3" fill="white"/>
-        <rect x="0" y="21" width="3" height="3" fill="white"/>
-        <rect x="25" y="6" width="3" height="3" fill="white"/>
-        <rect x="25" y="11" width="3" height="3" fill="white"/>
-        <rect x="25" y="16" width="3" height="3" fill="white"/>
-        <rect x="25" y="21" width="3" height="3" fill="white"/>
+      <!-- CL monogram logo -->
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="CareerLens">
+        <defs>
+          <linearGradient id="cl-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0f62fe"/>
+            <stop offset="100%" stop-color="#6929c4"/>
+          </linearGradient>
+        </defs>
+        <!-- Rounded square background -->
+        <rect width="36" height="36" rx="9" fill="url(#cl-grad)"/>
+        <!-- C arc -->
+        <path d="M23 10 A8.5 8.5 0 1 0 23 26" stroke="white" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <!-- L letter -->
+        <path d="M26 10 L26 26 L32 26" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <!-- Lens dot accent -->
+        <circle cx="32" cy="10" r="2.5" fill="#00d4aa" opacity="0.9"/>
       </svg>
-      <span>CareerLens</span>
-      <span class="logo-badge">IBM SkillsBuild</span>
+      <div style="display:flex;flex-direction:column;gap:1px;line-height:1">
+        <span style="font-size:1rem;font-weight:700;color:#ffffff;letter-spacing:-0.01em">CareerLens</span>
+        <span class="logo-badge" style="align-self:flex-start">IBM SkillsBuild</span>
+      </div>
     </div>
 
     <div class="header-spacer"></div>
@@ -98,6 +101,22 @@
           </svg>
         </span>
         Resume Analyzer
+      </div>
+
+      <div class="sidebar-item" data-page="resume-builder">
+        <span class="icon">
+          <svg width="16" height="18" viewBox="0 0 16 18" fill="none">
+            <path d="M2 0h8l6 6v12H2V0z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <path d="M9 0v6h6" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <line x1="3" y1="9" x2="9" y2="9" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="3" y1="12" x2="11" y2="12" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="3" y1="15" x2="8" y2="15" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="13" cy="14" r="2.5" fill="currentColor" opacity=".9"/>
+            <path d="M12.3 13.3 L13.7 14.7M13.7 13.3 L12.3 14.7" stroke="white" stroke-width="1" stroke-linecap="round"/>
+          </svg>
+        </span>
+        Resume Builder
+        <span class="tag tag-blue" style="font-size:0.6rem;padding:1px 6px;margin-left:auto">NEW</span>
       </div>
 
       <div class="sidebar-item" data-page="skills">
