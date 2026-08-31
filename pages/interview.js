@@ -243,9 +243,18 @@ function renderInterviewScreen(session, appState) {
           <div class="wc-bar-wrap" style="margin-bottom:0.75rem">
             <div class="wc-bar-fill" id="wc-bar" style="width:0%"></div>
           </div>
-          <textarea class="answer-textarea" id="answer-input" 
+          <textarea class="answer-textarea" id="answer-input"
             placeholder="Type your answer here. Be specific, use examples, and structure your response clearly…"
           >${existingAnswer}</textarea>
+          <div class="mic-row">
+            <button id="mic-btn" class="mic-btn" title="Start voice input" aria-label="Start voice input">
+              <span class="mic-rings"></span>
+              <svg class="mic-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+                <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V20H9v2h6v-2h-2v-2.08A7 7 0 0 0 19 11h-2z"/>
+              </svg>
+              <span class="mic-label">Speak</span>
+            </button>
+          </div>
           <hr class="section-divider">
           <div class="interview-actions">
             <div id="question-timer" class="interview-timer">02:00</div>
@@ -376,6 +385,111 @@ function mountInterview(appState) {
 
   answerInput?.addEventListener('input', updateWordCount);
   updateWordCount();
+
+  // Voice input
+  let _recognition = null;
+  let _isRecording = false;
+  const MIC_SVG = `<svg class="mic-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V20H9v2h6v-2h-2v-2.08A7 7 0 0 0 19 11h-2z"/></svg>`;
+  // Square stop icon for recording state
+  const STOP_SVG = `<svg class="mic-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
+
+  function _setMicIdle(btn) {
+    btn.querySelector('.mic-label').textContent = 'Speak';
+    const svgEl = btn.querySelector('.mic-svg');
+    if (svgEl) svgEl.outerHTML = MIC_SVG;  // swap back to mic
+    btn.classList.remove('recording');
+    btn.title = 'Start voice input';
+    btn.setAttribute('aria-label', 'Start voice input');
+    _isRecording = false;
+  }
+
+  function _setMicRecording(btn) {
+    btn.querySelector('.mic-label').textContent = 'Stop';
+    const svgEl = btn.querySelector('.mic-svg');
+    if (svgEl) svgEl.outerHTML = STOP_SVG;  // swap to stop square
+    btn.classList.add('recording');
+    btn.title = 'Stop voice input';
+    btn.setAttribute('aria-label', 'Stop voice input');
+    _isRecording = true;
+  }
+
+  function initVoiceInput() {
+    const micBtn = document.getElementById('mic-btn');
+    if (!micBtn) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      micBtn.disabled = true;
+      micBtn.title = 'Voice input not supported in this browser';
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    _recognition = recognition;
+
+    // Track the text that was in the textarea when recording started,
+    // so we can safely append new words without mangling existing text.
+    let baseText = '';
+    let interimSuffix = '';
+
+    recognition.onresult = (event) => {
+      let finalChunk = '';
+      interimSuffix = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalChunk += transcript;
+        } else {
+          interimSuffix += transcript;
+        }
+      }
+
+      if (finalChunk) {
+        baseText += (baseText.endsWith(' ') || baseText === '' ? '' : ' ') + finalChunk.trim();
+        interimSuffix = '';
+      }
+
+      // Show base + interim live in textarea
+      const display = interimSuffix
+        ? baseText + (baseText === '' ? '' : ' ') + interimSuffix
+        : baseText;
+      answerInput.value = display;
+      updateWordCount();
+    };
+
+    recognition.onend = () => {
+      const btn = document.getElementById('mic-btn');
+      if (btn) _setMicIdle(btn);
+      // Commit whatever is in the textarea as the final value
+      updateWordCount();
+    };
+
+    recognition.onerror = (event) => {
+      const btn = document.getElementById('mic-btn');
+      if (btn) _setMicIdle(btn);
+      if (event.error !== 'aborted') {
+        showToast('Voice input error: ' + event.error, 'error');
+      }
+    };
+
+    micBtn.addEventListener('click', () => {
+      if (!_isRecording) {
+        baseText = answerInput.value;
+        interimSuffix = '';
+        recognition.start();
+        _setMicRecording(micBtn);
+      } else {
+        recognition.stop();
+        // onend will reset the button
+      }
+    });
+  }
+
+  initVoiceInput();
 
   // Wire sample answer toggle + retry if feedback already exists (navigating back to answered question)
   const existingFeedbackArea = document.getElementById('feedback-area');
@@ -508,6 +622,8 @@ function mountInterview(appState) {
 
 function goToQuestion(idx, session, appState, timerInterval, sessionInterval) {
   if (idx < 0 || idx >= session.questions.length) return;
+  // Stop any active voice recognition before navigating
+  try { if (typeof _recognition !== 'undefined' && _recognition) _recognition.abort(); } catch (_) {}
   session.currentIndex = idx;
   saveState();
   navigateTo('interview');

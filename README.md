@@ -32,7 +32,7 @@
 | 🚀 **Career Path Recommender** | 20+ AI-matched career paths ranked by skill compatibility; filterable grid |
 | 🗺️ **Learning Roadmap** | 5-phase phased roadmap with milestones, course recommendations, timeline |
 | 🎓 **IBM SkillsBuild Courses** | 30+ curated courses ranked by your skill gaps; free/premium filter |
-| 🤖 **Mock Interview** | AI-graded interview practice with 50+ questions across 12+ careers |
+| 🤖 **Mock Interview** | AI-graded interview practice with 50+ questions across 12+ careers; voice input via Web Speech API |
 | 📊 **Job Readiness Score** | Composite 0–100 score from 5 weighted pillars; action plan |
 | 🏅 **Achievements** | 18 badges across 5 categories; XP levelling system; daily streaks |
 | ✏️ **Resume Builder** | ATS-optimised resume wizard with live preview; PDF & DOCX download |
@@ -127,6 +127,7 @@ New features added on top of the core interview engine:
 | **Progress bar** | Visual completion indicator across the session |
 | **Timed practice mode** | Optional countdown timer per question |
 | **Comparative session history** | Compare scores across past sessions |
+| **🎤 Voice input** | Speak your answers hands-free using the browser's Web Speech API; transcript is appended to the text field in real-time (Chrome / Edge); gracefully disabled on unsupported browsers |
 
 ---
 
@@ -179,7 +180,7 @@ All state is persisted to `localStorage` automatically:
 
 - **Vanilla JavaScript** (ES2020+, ES Modules)
 - **No runtime dependencies** — zero npm packages required for production
-- **Native browser APIs**: localStorage, FileReader, Clipboard, CSS Custom Properties, `window.print()` for PDF
+- **Native browser APIs**: localStorage, FileReader, Clipboard, CSS Custom Properties, `window.print()` for PDF, Web Speech API (`SpeechRecognition`) for voice input
 - **SVG** for radar chart visualization
 - **Vite** (optional dev server for hot-reload during development)
 
@@ -192,6 +193,7 @@ All state is persisted to `localStorage` automatically:
 | `a4e0683` | Resume Builder page — multi-step wizard, live preview, ATS score, PDF/DOCX export; app icon updated |
 | `9d37140` | 10+ new career paths; 10+ new courses; interview questions for new paths; Achievements system (badges, XP, streaks); project rebranded to CareerLens |
 | `715d1d3` | Interview enhancements — question type filter, word target, retry, sample answers, session summary, bookmarks, progress bar, timed mode, session history |
+| latest | Voice input for mock interview — Web Speech API toggle button, continuous transcription, additive append mode, anime-style ripple animation |
 | `29f24bb` | Fix resume upload/parsing regression |
 | `2a67d58` | Fix PDF resume upload and parsing |
 | `3c9fe31` | Initial commit — AI Career Copilot |

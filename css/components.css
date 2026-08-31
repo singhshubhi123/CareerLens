@@ -1467,3 +1467,104 @@
     overflow-y: visible;
   }
 }
+
+/* ── Voice Input Mic Button ── */
+.mic-row {
+  display: flex;
+  justify-content: center;
+  padding: 0.75rem 0 0.25rem;
+}
+
+.mic-btn {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #0f62fe 0%, #002d9c 100%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 4px 16px rgba(15, 98, 254, 0.45);
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.15s ease,
+              background 0.2s ease;
+  outline: none;
+  overflow: visible;
+}
+
+.mic-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 24px rgba(15, 98, 254, 0.6);
+}
+
+.mic-btn:active {
+  transform: scale(0.93);
+}
+
+.mic-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: rgba(255,255,255,0.85);
+}
+
+/* Anime-style multi-ring ripple — hidden until recording */
+.mic-rings {
+  display: none;
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.mic-rings::before,
+.mic-rings::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(218, 30, 40, 0.7);
+  animation: none;
+}
+
+/* Recording state */
+.mic-btn.recording {
+  background: linear-gradient(135deg, #da1e28 0%, #750e13 100%);
+  box-shadow: 0 4px 20px rgba(218, 30, 40, 0.55);
+}
+
+.mic-btn.recording:hover {
+  box-shadow: 0 6px 28px rgba(218, 30, 40, 0.75);
+}
+
+.mic-btn.recording .mic-rings {
+  display: block;
+}
+
+.mic-btn.recording .mic-rings::before {
+  animation: mic-ring 1.4s ease-out infinite;
+}
+
+.mic-btn.recording .mic-rings::after {
+  animation: mic-ring 1.4s ease-out infinite 0.5s;
+}
+
+.mic-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+  box-shadow: none;
+}
+
+@keyframes mic-ring {
+  0%   { transform: scale(1);   opacity: 0.8; }
+  100% { transform: scale(2.2); opacity: 0;   }
+}
